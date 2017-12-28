@@ -1,5 +1,5 @@
+import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketAddress;
 import java.util.HashMap;
 
 /**
@@ -13,11 +13,13 @@ import java.util.HashMap;
 public class CoordinatorRequestWorker implements Runnable {
 
 	private Socket activeSocket;
-	private HashMap<String, SocketAddress> systemNodes;
+	private HashMap<String, InetSocketAddress> systemNodes;
+	private final Object lockingKey;
 
-	public CoordinatorRequestWorker(Socket activeSocket, HashMap<String, SocketAddress> systemNodes) {
+	public CoordinatorRequestWorker(Socket activeSocket, HashMap<String, InetSocketAddress> systemNodes, Object lockingKey) {
 		this.activeSocket = activeSocket;
 		this.systemNodes = systemNodes;
+		this.lockingKey = lockingKey;
 	}
 
 	@Override
