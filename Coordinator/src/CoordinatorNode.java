@@ -31,7 +31,7 @@ public class CoordinatorNode {
 
 	/**
 	 * Default constructor. Initializes hash map for system nodes storing and sets
-	 * running flag on true. Also initializes fixed pool of threads which will host
+	 * running flag on TRUE. Also initializes fixed pool of threads which will host
 	 * workers for processing upcoming TCP connections.
 	 */
 	public CoordinatorNode() {
@@ -66,7 +66,7 @@ public class CoordinatorNode {
 
 	/**
 	 * Sets server node running flag to FALSE. It will result in finishing last
-	 * iteration of accepting TCP connection and then stop working.
+	 * iteration of accepting TCP connection and after that stop working.
 	 */
 	public void stop() {
 		this.runningFlag = false;
