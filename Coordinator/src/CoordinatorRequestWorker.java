@@ -44,30 +44,32 @@ public class CoordinatorRequestWorker implements Runnable {
 			closeSocket(this.activeSocket);
 			return; // examine this
 		}
-		
-		String[] commaSeparated = line.split(",");
-		if (!isRightFormat(commaSeparated)) {
+
+		String[] semicolonSeparated = line.split(";");
+		if (!isRightFormat(semicolonSeparated)) {
 			closeSocket(this.activeSocket);
 			return;
 		}
 
-		int requestType = Integer.valueOf(commaSeparated[0]);
-		switch(requestType) {
-			case 1:
-				caseNewNode(commaSeparated);
-				break;
-			case 2:
-				caseMissingNode(commaSeparated);
-				break;
-			case 3:
-				caseGetNewNeighbor(commaSeparated);
-				break;
-			default:
-				closeSocket(this.activeSocket);
-				return;
-				
+		int requestType = Integer.valueOf(semicolonSeparated[0]);
+		switch (requestType) {
+		case 1:
+			caseNewNode(semicolonSeparated);
+			break;
+		case 2:
+			caseMissingNode(semicolonSeparated);
+			break;
+		case 3:
+			caseGetNeighbors(semicolonSeparated);
+			break;
+		default:
+			System.out.println("Unknown request type.");
+			closeSocket(this.activeSocket);
+			return;
+
 		}
-		
+
+		closeSocket(this.activeSocket);
 	}
 
 	private boolean openTCPStreams(DataOutputStream outStream, DataInputStream inStream, Socket activeSocket) {
@@ -85,6 +87,7 @@ public class CoordinatorRequestWorker implements Runnable {
 
 	/**
 	 * Wrapper for socket.close() function.
+	 * 
 	 * @param socket
 	 *            Socket we want to close.
 	 */
@@ -95,9 +98,12 @@ public class CoordinatorRequestWorker implements Runnable {
 			System.err.println("Socket can not be close.");
 		}
 	}
+
 	/**
 	 * Wrapper function for reading line from data input stream.
-	 * @param inStream Input stream to read from.
+	 * 
+	 * @param inStream
+	 *            Input stream to read from.
 	 * @return Read string or null if reading can not be done.
 	 */
 	private String ReadUTF(DataInputStream inStream) {
@@ -134,26 +140,71 @@ public class CoordinatorRequestWorker implements Runnable {
 
 		return true;
 	}
+
+	/**
+	 * Parses address given as string to address as InetSocketAddress. Returns
+	 * InetSocketAddress object or null if any of given parameter format is wrong.
+	 * @param source String representing address.
+	 * @return Address in InetSocketAddress format.
+	 */
+	private InetSocketAddress parseAddress(String source) {
+
+		String[] splitted = source.split(":");
+		if (splitted.length != 2)
+			return null;
+		String hostname = splitted[0];
+		int port;
+		try {
+			port = Integer.valueOf(splitted[1]);
+		} catch (NumberFormatException nfe) {
+			return null;
+		}
+
+		InetSocketAddress destination = null;
+		try {
+			destination = new InetSocketAddress(hostname, port);
+		} catch (IllegalArgumentException iae) {
+			return null;
+		}
+		return destination;
+	}
+
 	/**
 	 * Processes given parameters towards the case of new node in the system.
+	 * 
 	 * @param commaSeparated
 	 */
 	private void caseNewNode(String[] commaSeparated) {
+
+		String newAddress = commaSeparated[1];
+		InetSocketAddress newSocketAddress = parseAddress(newAddress);
+		if(newSocketAddress == null) {
+			closeSocket(this.activeSocket);
+			return;
+		}
 		
+		this.systemNodes.put(newAddress, newSocketAddress);
+		return;
+
 	}
+
 	/**
 	 * Processes given parameters towards the case of missing node.
+	 * 
 	 * @param commaSeparated
 	 */
 	private void caseMissingNode(String[] commaSeparated) {
-			
+
 	}
+
 	/**
 	 * Processes given parameters towards the case of getting new neighbors.
-	 * @param commaSeparated Parameters.
+	 * 
+	 * @param commaSeparated
+	 *            Parameters.
 	 */
-	private void caseGetNewNeighbor(String[] commaSeparated) {
-		
+	private void caseGetNeighbors(String[] commaSeparated) {
+
 	}
 
 }

@@ -25,7 +25,7 @@ public class CoordinatorNode {
 	private boolean runningFlag;
 
 	// multi-threading
-	private static final int NUMBER_OF_THREADS = 10;
+	private static final int NUMBER_OF_THREADS = 20;
 	private final ExecutorService executor;
 	private final Object lockingKey = new Object();
 
