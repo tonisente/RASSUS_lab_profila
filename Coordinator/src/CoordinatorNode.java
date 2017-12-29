@@ -15,7 +15,6 @@ import java.util.concurrent.RejectedExecutionException;
  * When TCP connection is accepted new request worker is initialized to process
  * that request. Server can process three types of requests: 1 - entering the
  * system, 2 - leaving system, 3 - getting new neighbors.
- * 
  * @author Janko
  *
  */
