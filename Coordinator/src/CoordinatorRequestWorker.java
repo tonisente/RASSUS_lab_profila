@@ -1,6 +1,10 @@
+import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.HashMap;
@@ -30,8 +34,8 @@ public class CoordinatorRequestWorker implements Runnable {
 	public void run() {
 		// implement TCP message parsing and following system state manipulations
 		// at the end close "activeSocket" with ".close()" method
-		DataOutputStream outStream = null;
-		DataInputStream inStream = null;
+		PrintWriter outStream = null;
+		BufferedReader inStream = null;
 
 		boolean result = openTCPStreams(outStream, inStream, this.activeSocket);
 		if (!result) {
@@ -39,8 +43,13 @@ public class CoordinatorRequestWorker implements Runnable {
 			return;
 		}
 
-		String line = ReadUTF(inStream);
-		if (line == null) {
+		String line = "";
+		try {
+			line = inStream.readLine();
+		} catch (IOException e) {
+			System.err.println("Exception while reading with buffered reader.");
+		}
+		if ("".equals(line)) {
 			closeSocket(this.activeSocket);
 			return; // examine this
 		}
@@ -60,7 +69,7 @@ public class CoordinatorRequestWorker implements Runnable {
 			caseMissingNode(semicolonSeparated);
 			break;
 		case 3:
-			caseGetNeighbors(semicolonSeparated);
+			caseGetNeighbors(semicolonSeparated, outStream);
 			break;
 		default:
 			System.out.println("Unknown request type.");
@@ -68,15 +77,13 @@ public class CoordinatorRequestWorker implements Runnable {
 			return;
 
 		}
-
-		closeSocket(this.activeSocket);
 	}
 
-	private boolean openTCPStreams(DataOutputStream outStream, DataInputStream inStream, Socket activeSocket) {
+	private boolean openTCPStreams(PrintWriter outStream, BufferedReader inStream, Socket activeSocket) {
 
 		try {
-			outStream = new DataOutputStream(activeSocket.getOutputStream());
-			inStream = new DataInputStream(activeSocket.getInputStream());
+			outStream = new PrintWriter(new OutputStreamWriter(this.activeSocket.getOutputStream()));
+			inStream = new BufferedReader(new InputStreamReader(this.activeSocket.getInputStream()));
 			return true;
 		} catch (IOException e) {
 			System.err.println("Exception when opening output or input TCP stream.");
@@ -126,7 +133,7 @@ public class CoordinatorRequestWorker implements Runnable {
 	 * @return True if line is in right format, false if not.
 	 */
 	private boolean isRightFormat(String[] commaSeparated) {
-		final int minimumParameters = 2;
+		final int minimumParameters = 3;
 
 		int length = commaSeparated.length;
 		if (length < minimumParameters)
@@ -172,39 +179,74 @@ public class CoordinatorRequestWorker implements Runnable {
 	/**
 	 * Processes given parameters towards the case of new node in the system.
 	 * 
-	 * @param commaSeparated
+	 * @param semicolonSeparated
 	 */
-	private void caseNewNode(String[] commaSeparated) {
+	private void caseNewNode(String[] semicolonSeparated) {
 
-		String newAddress = commaSeparated[1];
+		String newAddress = semicolonSeparated[1] + ":" + semicolonSeparated[2];
 		InetSocketAddress newSocketAddress = parseAddress(newAddress);
 		if(newSocketAddress == null) {
 			closeSocket(this.activeSocket);
 			return;
 		}
 		
-		this.systemNodes.put(newAddress, newSocketAddress);
+		synchronized(this.lockingKey) {
+			this.systemNodes.put(newAddress, newSocketAddress);
+		}
+		
+		closeSocket(this.activeSocket);
 		return;
-
 	}
 
 	/**
 	 * Processes given parameters towards the case of missing node.
 	 * 
-	 * @param commaSeparated
+	 * @param semicolonSeparated
 	 */
-	private void caseMissingNode(String[] commaSeparated) {
+	private void caseMissingNode(String[] semicolonSeparated) {
 		//test
+		String ip = semicolonSeparated[1];
+		String port = semicolonSeparated[2];
+		String key = ip + ":" + port;
+		
+		synchronized(this.lockingKey) {
+			this.systemNodes.remove(key);
+		}
+		
+		closeSocket(this.activeSocket);
+		return;
 	}
 
 	/**
 	 * Processes given parameters towards the case of getting new neighbors.
 	 * 
-	 * @param commaSeparated
+	 * @param semicolonSeparated
 	 *            Parameters.
 	 */
-	private void caseGetNeighbors(String[] commaSeparated) {
+	private void caseGetNeighbors(String[] semicolonSeparated, PrintWriter outStream) {
 
+		int neighborsCount;
+		try {
+			neighborsCount = Integer.parseInt(semicolonSeparated[1]);
+		}catch(NumberFormatException nfe) {
+			closeSocket(this.activeSocket);
+			return;
+		}
+		
+		String[] neighbors = getNNeighbors(neighborsCount);
+		for(String toSend : neighbors) {
+			outStream.println(toSend);
+		}
+		
+		closeSocket(this.activeSocket);
+		return;
+	}
+	private String[] getNNeighbors(int count) {
+		
+		//TODO osmisli algoritam za dobivanje n random susjeda
+		
+		return null;
+		
 	}
 
 }
