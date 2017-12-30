@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -47,8 +48,7 @@ public class CoordinatorNode {
 	 */
 	public void start() {
 
-		ServerSocket passiveSocket = null;
-		openPassiveSocket(passiveSocket);
+		ServerSocket passiveSocket = openPassiveSocket();
 
 		while (this.runningFlag) {
 
@@ -104,13 +104,15 @@ public class CoordinatorNode {
 	 * exits the system with error code 1.
 	 * @param socket
 	 */
-	private void openPassiveSocket(ServerSocket socket) {
+	private ServerSocket openPassiveSocket() {
 		try {
-			socket = new ServerSocket();
+			return new ServerSocket(50000, 10, InetAddress.getByName("127.0.0.1"));
 		} catch (IOException e) {
 			System.err.println("Could not open TCP pasive socket");
 			System.exit(1);
 		}
+		
+		return null;
 	}
 
 	/**

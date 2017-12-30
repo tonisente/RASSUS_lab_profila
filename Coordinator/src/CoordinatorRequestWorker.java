@@ -34,11 +34,9 @@ public class CoordinatorRequestWorker implements Runnable {
 	public void run() {
 		// implement TCP message parsing and following system state manipulations
 		// at the end close "activeSocket" with ".close()" method
-		PrintWriter outStream = null;
-		BufferedReader inStream = null;
-
-		boolean result = openTCPStreams(outStream, inStream, this.activeSocket);
-		if (!result) {
+		PrintWriter outStream = createPrintWriter(this.activeSocket);
+		BufferedReader inStream = createBufferedReader(this.activeSocket);
+		if (outStream == null || inStream == null) {
 			closeSocket(this.activeSocket);
 			return;
 		}
@@ -79,15 +77,22 @@ public class CoordinatorRequestWorker implements Runnable {
 		}
 	}
 
-	private boolean openTCPStreams(PrintWriter outStream, BufferedReader inStream, Socket activeSocket) {
+	private BufferedReader createBufferedReader(Socket activeSocket) {
+		try {
+			return new BufferedReader(new InputStreamReader(this.activeSocket.getInputStream()));
+		} catch (IOException e) {
+			System.err.println("Exception while opening buffered reader.");
+			return null;
+		}
+	}
+	
+	private PrintWriter createPrintWriter(Socket activeSocket) {
 
 		try {
-			outStream = new PrintWriter(new OutputStreamWriter(this.activeSocket.getOutputStream()));
-			inStream = new BufferedReader(new InputStreamReader(this.activeSocket.getInputStream()));
-			return true;
+			return new PrintWriter(new OutputStreamWriter(this.activeSocket.getOutputStream()));
 		} catch (IOException e) {
-			System.err.println("Exception when opening output or input TCP stream.");
-			return false;
+			System.err.println("Exception while opening print writer.");
+			return null;
 		}
 
 	}
@@ -133,7 +138,7 @@ public class CoordinatorRequestWorker implements Runnable {
 	 * @return True if line is in right format, false if not.
 	 */
 	private boolean isRightFormat(String[] commaSeparated) {
-		final int minimumParameters = 3;
+		final int minimumParameters = 2;
 
 		int length = commaSeparated.length;
 		if (length < minimumParameters)
