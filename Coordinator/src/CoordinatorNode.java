@@ -16,12 +16,19 @@ import java.util.concurrent.RejectedExecutionException;
  * When TCP connection is accepted new request worker is initialized to process
  * that request. Server can process three types of requests: 1 - entering the
  * system, 2 - leaving system, 3 - getting new neighbors.
+ * After coordinator is instanced, it must be started.
  * @author Janko
  *
  */
 public class CoordinatorNode {
 
+	/**
+	 * Map structure for nodes in distributed system.
+	 */
 	private HashMap<String, InetSocketAddress> systemNodes;
+	/**
+	 * Boolean value showing coordinator running state.
+	 */
 	private boolean runningFlag;
 
 	// multi-threading
@@ -140,7 +147,7 @@ public class CoordinatorNode {
 
 	/**
 	 * Starts worker in a new thread. Worker's job is to process TCP request.
-	 * @param newActiveSocket
+	 * @param newActiveSocket Active TCP socket for client communication.
 	 */
 	private boolean processRequestInNewThread(Socket newActiveSocket) {
 		// make new thread to serve TCP request
