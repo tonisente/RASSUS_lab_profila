@@ -60,17 +60,19 @@ public class Peer {
     }
 
     public void start() {
-        System.out.println("Starting ... "); // TODO obrisi
+        System.out.println("Starting ... "); // TODO obrisi?
 
 //        // register on network
-//        sayHelloToCoordinator(); // TODO
+//        sayHelloToCoordinator(); // TODO 1
 
         // start listening tread
         Thread listenThread = new Thread(new PeerListener(neighbours, listenSocket, runningFlag));
         listenThread.start();
 
+        // TODO 2: javljanje susjedima i uspostava veza medju susjedima
+
         // wait for user input
-        waitForCommand(); // TODO: connect to network via command?!
+            waitForCommand(); // TODO: connect to network via command?!
     }
 
     /**
@@ -90,6 +92,10 @@ public class Peer {
 
             // send a message
             writer.println(sendMessage);
+
+            // TODO 1: spremanje susjeda
+
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -121,6 +127,8 @@ public class Peer {
                 }
                 break;
             case 'm':
+                // TODO 3: generiranje stabla prije slanja poruke
+                // TODO 4: slanje poruke po stablu
                 sendMessage();
                 break;
             default:
@@ -135,7 +143,7 @@ public class Peer {
         System.exit(0);
     }
 
-    private void sendMessage() {
+    private void /* string */ sendMessage(/* ip; port, poruku */) {
         for (String port : neighbours) {
             try (Socket clientSocket = new Socket("localhost", Integer.parseInt(port));/*SOCKET->CONNECT*/) { //TODO: promjeni localhost adresu
 
@@ -163,6 +171,8 @@ public class Peer {
             }
         }
     }
+
+
 
     public static void main(String args[]) {
         new Peer(args[0]).start();
