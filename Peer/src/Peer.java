@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -24,6 +25,8 @@ public class Peer {
     private static final int LISTEN_SOCKET_TIMEOUT = 500; // ms
     private ServerSocket listenSocket;
     private AtomicBoolean runningFlag;
+    private List<String> children;
+    private Map<String,List> treeNeighbor;
 
 //    Peer() {
 //        try {
@@ -50,6 +53,7 @@ public class Peer {
 
             neighbours = Collections.synchronizedSet(new TreeSet<String>()); // thread safe set (hopefully)
             runningFlag = new AtomicBoolean(true);
+            treeNeighbor=new HashMap<>();
 
             System.out.println("MY ADDRESS: " + MY_ADDRESS + " :: MY PORT: " + MY_PORT + "\n");
         } catch (IOException ex) {
@@ -63,13 +67,15 @@ public class Peer {
         System.out.println("Starting ... "); // TODO obrisi?
 
 //        // register on network
-//        sayHelloToCoordinator(); // TODO 1
+//        sayHelloToCoordinator();
+        //getNeighbours(5);
 
         // start listening tread
         Thread listenThread = new Thread(new PeerListener(neighbours, listenSocket, runningFlag));
         listenThread.start();
 
         // TODO 2: javljanje susjedima i uspostava veza medju susjedima
+        //neighbourRequest();
 
         // wait for user input
             waitForCommand(); // TODO: connect to network via command?!
@@ -93,9 +99,33 @@ public class Peer {
             // send a message
             writer.println(sendMessage);
 
-            // TODO 1: spremanje susjeda
+            socket.close();
 
 
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    /*
+     *Method used for getting n neighbor peers.
+     */
+    private void getNeighbours(int n) {
+    	String message="2;" + n;
+    	try (Socket socket = new Socket(COORDINATOR_IPADRESS, COORDINATOR_PORT)){
+
+            PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+            writer.println(message);
+            // dodavanje susjeda koji nisu ja
+            //ovo radi samo sa portovima posto je adresa localhost
+            String answer;
+            while((answer=reader.readLine())!=null) {
+            	String[] fields=answer.split(";");
+            	if(Integer.parseInt(fields[1])!=this.MY_PORT) {
+            		this.neighbours.add(fields[1]);
+            	}
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -128,8 +158,9 @@ public class Peer {
                 break;
             case 'm':
                 // TODO 3: generiranje stabla prije slanja poruke
+            	//treeRequest();
                 // TODO 4: slanje poruke po stablu
-                sendMessage();
+            	//messageSender("TEXT!")
                 break;
             default:
                 System.out.println("Unsupported command!");
@@ -142,12 +173,30 @@ public class Peer {
         sc.close();
         System.exit(0);
     }
+    /*
+     *Method used for asking pears if they are able to be this peer neighbor. 
+     */
+    private void neighborRequest() {
+    	String message="4;"+this.MY_ADDRESS+";"+this.MY_PORT;
+    	sendMessage(message);
+    }
+    /*
+     * Method used for creating a tree.
+     */
+    private void treeRequest() {
+    	children=new ArrayList<>();
+    	String message="5;"+this.MY_ADDRESS+";"+this.MY_PORT+";"+this.MY_ADDRESS+";"+this.MY_PORT;
+    	sendMessage(message);
+    }
+    
+    private void messageSender(String text) {
+    	String message="6;"+this.MY_ADDRESS+";"+this.MY_PORT+";"+text;
+    	sendMessageToChildren(message);
+    }
 
-    private void /* string */ sendMessage(/* ip; port, poruku */) {
+    private void sendMessage(String message) {
         for (String port : neighbours) {
             try (Socket clientSocket = new Socket("localhost", Integer.parseInt(port));/*SOCKET->CONNECT*/) { //TODO: promjeni localhost adresu
-
-                String sndString = "Port " + MY_PORT + " sending to port: " + port;
 
                 // get the socket's output stream and open a PrintWriter on it
                 PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(
@@ -158,18 +207,57 @@ public class Peer {
                         clientSocket.getInputStream()));
 
                 // send a String then terminate the line and flush
-                outToServer.println(sndString);//WRITE
+                //slucaj kad bi slali root peeru
+                if(message.startsWith("5;") && message.split(";")[3]==port)
+                	continue;
+                outToServer.println(message);//WRITE
                 System.out.println("Message sent!");
 
                 // read a line of text
                 String rcvString = inFromServer.readLine();//READ
                 System.out.println("Received answer: " + rcvString);
+                //odvajamo razlièite moguænosti odgovora
+                if(message.startsWith("4;")) {
+                	if(rcvString.startsWith("0"))
+                		this.neighbours.remove(port);//ukoliko nas cvor odbije za susjeda,brisemo ga iz liste
+                }
+                else if(message.startsWith("5;")) {
+                	String[] tmp=rcvString.split(";");
+                	if(this.treeNeighbor.containsKey(tmp[1]+";"+tmp[2])) {
+                		this.treeNeighbor.get(tmp[1]+";"+tmp[2]).add(tmp[4]);
+                	}
+                	else {
+                		this.children.add(tmp[4]);
+                		this.treeNeighbor.put(tmp[1]+";"+tmp[2], children);
+                	}
+                }
             } catch (ConnectException e) {
                 System.out.println("CANT CONNECT!!!");
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
         }
+        
+    }
+    
+    private void sendMessageToChildren(String message) {
+        	List<String> tmp=this.treeNeighbor.get(message.split(";")[1]+message.split(";")[2]);
+        	for(String s:tmp) {
+        		try (Socket clientSocket = new Socket("localhost", Integer.parseInt(s));){
+
+        			PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
+                    BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                    outToServer.println(message);//WRITE
+                    System.out.println("Message sent!");
+                    //primanje odgovora?
+        		} catch (NumberFormatException e) {
+					e.printStackTrace();
+				} catch (UnknownHostException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+        	}
     }
 
 
