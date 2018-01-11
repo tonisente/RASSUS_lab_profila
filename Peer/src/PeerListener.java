@@ -2,7 +2,9 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -16,12 +18,14 @@ private final ExecutorService executor;
     private Set<String> neighbours;
     private ServerSocket listenSocket;
     private AtomicBoolean runningFlag;
+    private ConcurrentHashMap<String, List<String>> trees;
 
     PeerListener(Set<String> neighbours, ServerSocket listenSocket, AtomicBoolean runningFlag) {
         this.neighbours = neighbours;
         this.listenSocket = listenSocket;
         this.runningFlag = runningFlag;
 
+        this.trees = new ConcurrentHashMap<>();
         executor = Executors.newFixedThreadPool(NUMBER_OF_THREADS);
     }
 
@@ -56,7 +60,8 @@ private final ExecutorService executor;
                  Socket clientSocket = listenSocket.accept();//ACCEPT
 
                  // execute a tcp request handler in a new thread
-                 Runnable worker = new PeerListenerWorker(clientSocket, runningFlag);
+                 Runnable worker = new PeerListenerWorker(clientSocket, runningFlag, neighbours, trees,
+                         listenSocket.getLocalSocketAddress().toString(), listenSocket.getLocalPort());
                  executor.execute(worker);
             } catch (SocketTimeoutException ignore_and_continue) {
             } catch (IOException ex) {
