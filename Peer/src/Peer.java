@@ -1,9 +1,7 @@
 import java.io.*;
-import java.net.ConnectException;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -15,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class Peer {
     private static final String COORDINATOR_IPADRESS = "localhost";
-    private static final int COORDINATOR_PORT = 8080;
+    private static final int COORDINATOR_PORT = 50000;
 
     private String MY_ADDRESS;
     private int MY_PORT;
@@ -25,9 +23,10 @@ public class Peer {
     private static final int LISTEN_SOCKET_TIMEOUT = 500; // ms
     private ServerSocket listenSocket;
     private AtomicBoolean runningFlag;
-    private List<String> children;
-    private Map<String,List> treeNeighbor;
+    private ConcurrentHashMap<String, List<String>> trees;
 
+
+//       TODO:  DONT DELETE THIS CONSTUCTOR!! IT SHOULD BE USED IN FINAL VERSION.
 //    Peer() {
 //        try {
 //            listenSocket = new ServerSocket();
@@ -48,12 +47,13 @@ public class Peer {
         try {
             listenSocket = new ServerSocket(Integer.parseInt(port));
             listenSocket.setSoTimeout(LISTEN_SOCKET_TIMEOUT);
-            MY_ADDRESS = listenSocket.getLocalSocketAddress().toString();
+
+            MY_ADDRESS = "localhost"; // TODO: listenSocket.getInetAddress().toString();
             MY_PORT = listenSocket.getLocalPort();
 
             neighbours = Collections.synchronizedSet(new TreeSet<String>()); // thread safe set (hopefully)
             runningFlag = new AtomicBoolean(true);
-            treeNeighbor=new HashMap<>();
+            trees = new ConcurrentHashMap<>();
 
             System.out.println("MY ADDRESS: " + MY_ADDRESS + " :: MY PORT: " + MY_PORT + "\n");
         } catch (IOException ex) {
@@ -64,71 +64,18 @@ public class Peer {
     }
 
     public void start() {
-        System.out.println("Starting ... "); // TODO obrisi?
-
-//        // register on network
-//        sayHelloToCoordinator();
-        //getNeighbours(5);
+        System.out.println("Starting ... ");
 
         // start listening tread
-        Thread listenThread = new Thread(new PeerListener(neighbours, listenSocket, runningFlag));
+        Thread listenThread = new Thread(new PeerListener(neighbours, listenSocket, runningFlag, trees));
         listenThread.start();
 
-        // TODO 2: javljanje susjedima i uspostava veza medju susjedima
-        //neighbourRequest();
+        Utils.sleep(500);
+
+        sayHelloToCoordinator();
 
         // wait for user input
-            waitForCommand(); // TODO: connect to network via command?!
-    }
-
-    /**
-     * Sends message to coordinator so coordinator can put it to a
-     * list of existing peers in network.
-     */
-    private void sayHelloToCoordinator() {
-        String sendMessage = "1;" + MY_ADDRESS + ";" + MY_PORT;
-
-        try (Socket socket = new Socket(COORDINATOR_IPADRESS, COORDINATOR_PORT)){
-
-            // get the socket's output stream and open a PrintWriter on it
-            PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
-
-            // get the socket's input stream and open a BufferedReader on it
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-            // send a message
-            writer.println(sendMessage);
-
-            socket.close();
-
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-    /*
-     *Method used for getting n neighbor peers.
-     */
-    private void getNeighbours(int n) {
-    	String message="2;" + n;
-    	try (Socket socket = new Socket(COORDINATOR_IPADRESS, COORDINATOR_PORT)){
-
-            PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-            writer.println(message);
-            // dodavanje susjeda koji nisu ja
-            //ovo radi samo sa portovima posto je adresa localhost
-            String answer;
-            while((answer=reader.readLine())!=null) {
-            	String[] fields=answer.split(";");
-            	if(Integer.parseInt(fields[1])!=this.MY_PORT) {
-            		this.neighbours.add(fields[1]);
-            	}
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        waitForCommand();
     }
 
     /**
@@ -142,25 +89,29 @@ public class Peer {
 
 
         do {
-            System.out.println("Enter a command:");
+            System.out.print("> ");
             String command = sc.nextLine().trim();
             char first = command.charAt(0);
 
             switch(first) {
-            case 'q':
+            case 'q': // quit
                 quit = true;
                 break;
-            case 'a':
-                String[] newNbrs = command.split(" ");
-                for (int i = 1; i < newNbrs.length; i++) {
-                    neighbours.add(newNbrs[i]);
-                }
+            case 'a': // add
+                addNeighboursManualy(command);
                 break;
-            case 'm':
-                // TODO 3: generiranje stabla prije slanja poruke
-            	//treeRequest();
-                // TODO 4: slanje poruke po stablu
-            	//messageSender("TEXT!")
+            case 'm': // message
+            	treeRequest();
+                Utils.sleep(1000); // wait a little bit for tree to spread
+            	messageBroadcast("Hello world!!!");
+            	trees.remove(MY_ADDRESS + ";" + MY_PORT);
+                break;
+            case 'n': // get list of neighbours from coordinator
+                Integer noNeighbours = Integer.parseInt(command.substring(2, 3));
+                getNeighbours(noNeighbours);
+                break;
+            case 'h': // hello :)
+                sayHelloToCoordinator();
                 break;
             default:
                 System.out.println("Unsupported command!");
@@ -173,94 +124,74 @@ public class Peer {
         sc.close();
         System.exit(0);
     }
-    /*
-     *Method used for asking pears if they are able to be this peer neighbor. 
+
+    /**
+     * Sends message to coordinator so coordinator can put it to a
+     * list of existing peers in network.
      */
-    private void neighborRequest() {
-    	String message="4;"+this.MY_ADDRESS+";"+this.MY_PORT;
-    	sendMessage(message);
+    private void sayHelloToCoordinator() {
+        String message = "1;" + MY_ADDRESS + ";" + MY_PORT;
+        Utils.sendMessage(COORDINATOR_IPADRESS, COORDINATOR_PORT, message);
     }
-    /*
-     * Method used for creating a tree.
+
+    /**
+     * Method used for getting n neighbor peers.
+     * @param n number of requested neighbours from central coordinator
+     */
+    private void getNeighbours(int n) {
+    	String message = "2;" + n;
+    	List<String> answer = Utils.sendMessageWithAnswer(COORDINATOR_IPADRESS, COORDINATOR_PORT, message);
+
+        neighbours.addAll(answer);
+
+        // print all current neighbours
+        System.out.println();
+        System.out.println(" - neighbours -");
+        for (String neighbour : neighbours) {
+            System.out.println("    -> " + neighbour);
+        }
+        System.out.println();
+    }
+
+    /**
+     * Broadcast message for tree creation.
      */
     private void treeRequest() {
-    	children=new ArrayList<>();
-    	String message="5;"+this.MY_ADDRESS+";"+this.MY_PORT+";"+this.MY_ADDRESS+";"+this.MY_PORT;
-    	sendMessage(message);
-    }
-    
-    private void messageSender(String text) {
-    	String message="6;"+this.MY_ADDRESS+";"+this.MY_PORT+";"+text;
-    	sendMessageToChildren(message);
-    }
+        String key = MY_ADDRESS + ";" + MY_PORT;
+        trees.put(key, new ArrayList<>());
 
-    private void sendMessage(String message) {
-        for (String port : neighbours) {
-            try (Socket clientSocket = new Socket("localhost", Integer.parseInt(port));/*SOCKET->CONNECT*/) { //TODO: promjeni localhost adresu
+        String message = String.format("%d;%s;%s;%s;%s", 5, MY_ADDRESS, MY_PORT, MY_ADDRESS, MY_PORT);
 
-                // get the socket's output stream and open a PrintWriter on it
-                PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(
-                        clientSocket.getOutputStream()), true);
-
-                // get the socket's input stream and open a BufferedReader on it
-                BufferedReader inFromServer = new BufferedReader(new InputStreamReader(
-                        clientSocket.getInputStream()));
-
-                // send a String then terminate the line and flush
-                //slucaj kad bi slali root peeru
-                if(message.startsWith("5;") && message.split(";")[3]==port)
-                	continue;
-                outToServer.println(message);//WRITE
-                System.out.println("Message sent!");
-
-                // read a line of text
-                String rcvString = inFromServer.readLine();//READ
-                System.out.println("Received answer: " + rcvString);
-                //odvajamo razlièite moguænosti odgovora
-                if(message.startsWith("4;")) {
-                	if(rcvString.startsWith("0"))
-                		this.neighbours.remove(port);//ukoliko nas cvor odbije za susjeda,brisemo ga iz liste
-                }
-                else if(message.startsWith("5;")) {
-                	String[] tmp=rcvString.split(";");
-                	if(this.treeNeighbor.containsKey(tmp[1]+";"+tmp[2])) {
-                		this.treeNeighbor.get(tmp[1]+";"+tmp[2]).add(tmp[4]);
-                	}
-                	else {
-                		this.children.add(tmp[4]);
-                		this.treeNeighbor.put(tmp[1]+";"+tmp[2], children);
-                	}
-                }
-            } catch (ConnectException e) {
-                System.out.println("CANT CONNECT!!!");
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
+    	// TODO: parallel in multiple threads?!
+        for (String neighbour : neighbours) {
+            Utils.sendMessage(neighbour, message);
         }
-        
-    }
-    
-    private void sendMessageToChildren(String message) {
-        	List<String> tmp=this.treeNeighbor.get(message.split(";")[1]+message.split(";")[2]);
-        	for(String s:tmp) {
-        		try (Socket clientSocket = new Socket("localhost", Integer.parseInt(s));){
-
-        			PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
-                    BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                    outToServer.println(message);//WRITE
-                    System.out.println("Message sent!");
-                    //primanje odgovora?
-        		} catch (NumberFormatException e) {
-					e.printStackTrace();
-				} catch (UnknownHostException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-        	}
     }
 
+    /**
+     * Broadcast message to all neighbours.
+     * @param message
+     */
+    private void messageBroadcast(String message) {
+        String sendMessage = String.format("%d;%s;%s;%s", 6, MY_ADDRESS, MY_PORT, message);
 
+        // multithread?!
+        for (String child : trees.get(MY_ADDRESS + ";" + MY_PORT)) {
+            Utils.sendMessage(child, sendMessage);
+        }
+    }
+
+    /**
+     * Adds manualy given peer(s) as neighbours (mostly used for testing purpose).
+     * @param command in format: "a port1 port2 port3 ... "
+     */
+    private void addNeighboursManualy(String command) {
+        String[] newNbrs = command.split(" ");
+        String ipAddress = "localhost";
+        for (int i = 1; i < newNbrs.length; i++) {
+            neighbours.add(ipAddress + ";" + newNbrs[i]);
+        }
+    }
 
     public static void main(String args[]) {
         new Peer(args[0]).start();

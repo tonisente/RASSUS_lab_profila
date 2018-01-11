@@ -1,7 +1,6 @@
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -10,7 +9,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PeerListenerWorker implements Runnable {
 
-    private static final int SLEEP_TIME = 1500; // ms
     private final String MY_ADDRESS;
     private final Integer MY_PORT;
 
@@ -44,11 +42,7 @@ public class PeerListenerWorker implements Runnable {
 
             // read a few lines of text
             while ((receivedString = inFromClient.readLine()) != null/*READ*/) {
-                // sleep a little bit for simulation
-                try {
-                    Thread.sleep(SLEEP_TIME);
-                } catch (InterruptedException ignore) {
-                }
+                Utils.sleep(200);
 
                 String stringToSend = MessageDecider(receivedString);
 
@@ -59,7 +53,8 @@ public class PeerListenerWorker implements Runnable {
 
                 break; // while loop
             }
-        } catch (SocketTimeoutException ignore_and_continue) {
+        } catch (SocketTimeoutException ignore) {
+            ignore.printStackTrace();
         } catch (IOException ex) {
             System.err.println("Exception caught when trying to read or send data: " + ex);
         }
@@ -71,16 +66,16 @@ public class PeerListenerWorker implements Runnable {
 
         switch (components[0]) {
             case "4":
-                answer = AddNeighbour(components[1], components[2]);
+                answer = addNeighbour(components[1], components[2]);
                 break;
             case "5":
-                TreeCreation(components[1], components[2], components[3], components[4]);
+                treeCreation(components[1], components[2], components[3], Integer.parseInt(components[4]));
                 break;
             case "6":
-                SpreadMessage(components[1], components[2], components[3]);
+                spreadMessage(components[1], components[2], components[3]);
                 break;
             case "7":
-                answer = AcceptParentship(components[1], components[2], components[3], components[4]);
+                answer = acceptParentship(components[1], components[2], components[3], components[4]);
                 break;
             default:
                 System.out.println("Recieved message is invalid!");
@@ -91,42 +86,46 @@ public class PeerListenerWorker implements Runnable {
     }
 
     // message type 4
-    private String AddNeighbour(String ipAddress, String port) {
+    private String addNeighbour(String ipAddress, String port) {
         neighbours.add(ipAddress + ";" + port);
 
         return "1";
     }
 
     // message type 5
-    private void TreeCreation(String rootIpAddress, String rootPort, String ipSender, String portSender) {
+    private void treeCreation(String rootIpAddress, String rootPort, String ipSender, Integer portSender) {
         String key = rootIpAddress + ";" + rootPort;
         String sender = ipSender + portSender;
 
         // tree already registered
         if (trees.containsKey(key)) return;
 
+        trees.put(key, new ArrayList<>());
+
         // send information to neighbours (except to node who send this message)
         for (String neighbour : neighbours) {
             if (neighbour.equals(sender)) continue;
 
             String sendMessage = String.format("%d;%s;%s;%s;%s", 5, rootIpAddress, rootPort, MY_ADDRESS, MY_PORT);
-            SendMessage(neighbour, sendMessage);
+            Utils.sendMessage(neighbour, sendMessage);
         }
 
         // send parentship request
         String parentshipRequest = String.format("%d;%s;%s;%s;%s", 7, rootIpAddress, rootPort, MY_ADDRESS, MY_PORT);
-        String parentshipAnswer = SendMessageWithAnswer(ipSender + ";" + portSender, parentshipRequest);
+        String parentshipAnswer = Utils.sendMessageWithAnswer(ipSender, portSender, parentshipRequest).get(0);
         if (parentshipAnswer.startsWith("1")) {
             // when some node accept parentship, then we can save this new tree
-            trees.put(key, new ArrayList<>());
+            // TODO ?!
         }
     }
 
     // message type 6
-    private void SpreadMessage(String ipRoot, String portRoot, String sendMessage) {
+    private void spreadMessage(String ipRoot, String portRoot, String sendMessage) {
+        System.out.format("Message from root %s: %s\n", portRoot, sendMessage);
+
         // send message to all neighbours
         for (String neighbour : trees.get(ipRoot + ";" + portRoot)) {
-            SendMessage(neighbour, String.format("%d;%s;%s;%s", 6, ipRoot, portRoot, sendMessage));
+            Utils.sendMessage(neighbour, String.format("%d;%s;%s;%s", 6, ipRoot, portRoot, sendMessage));
         }
 
         // delete tree from
@@ -134,88 +133,14 @@ public class PeerListenerWorker implements Runnable {
     }
 
     // message type 7
-    private String AcceptParentship(String rootIpAddress, String rootPort, String ipSender, String portSender) {
-        trees.get(rootIpAddress + ";" + rootPort).add(ipSender + ";" + portSender);
+    private String acceptParentship(String rootIpAddress, String rootPort, String ipSender, String portSender) {
+//        String key = rootIpAddress + ";" + rootPort; // TODO ?!
+        String key = "localhost" + ";" + rootPort;
+//        String value = ipSender + ";" + portSender; // TODO ?!
+        String value = "localhost;" + portSender;
 
-        return "1";
-    }
+        trees.get(key).add(value);
 
-    /**
-     * Sends a message using socket with random transport address.
-     * After the message is sent, tcp connection closes.
-     * Answer from receiver is not expected.
-     *
-     * @param destinationIpAddress
-     * @param destinationPort
-     * @param message
-     */
-    public static void SendMessage(String destinationIpAddress, Integer destinationPort, String message) {
-        try (Socket clientSocket = new Socket(destinationIpAddress, destinationPort)) {
-            PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
-
-            outToServer.println(message);//WRITE
-        } catch (NumberFormatException e) {
-            e.printStackTrace();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Sends a message using socket with random transport address.
-     * After the message is sent, tcp connection closes.
-     * Answer from receiver is not expected.
-     *
-     * @param transportAddress in "ipAddress;port" format
-     * @param message content
-     */
-    public static void SendMessage(String transportAddress, String message) {
-        String[] components = transportAddress.split(";");
-        SendMessage(components[0], Integer.parseInt(components[1]), message);
-    }
-
-    /**
-     * Sends a message using random socket.
-     * After the message is sent, socket expects answer from receiver.
-     *
-     * @param destinationIpAddress
-     * @param destinationPort
-     * @param message
-     * @return receivers answer
-     */
-    public static String SendMessageWithAnswer(String destinationIpAddress, Integer destinationPort, String message) {
-        String receivedAnsewer = "";
-
-        try (Socket clientSocket = new Socket(destinationIpAddress, destinationPort)) {
-            PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-
-            outToServer.println(message);//WRITE
-
-            receivedAnsewer = reader.readLine();
-        } catch (NumberFormatException e) {
-            e.printStackTrace();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return receivedAnsewer;
-    }
-
-    /**
-     * Sends a message using random socket.
-     * After the message is sent, socket expects answer from receiver.
-     *
-     * @param transportAddress in "ipAddress;port" format
-     * @param message content
-     * @return receivers answer
-     */
-    public static String SendMessageWithAnswer(String transportAddress, String message) {
-        String[] components = transportAddress.split(";");
-        return SendMessageWithAnswer(components[0], Integer.parseInt(components[1]), message);
+        return "1\n";
     }
 }

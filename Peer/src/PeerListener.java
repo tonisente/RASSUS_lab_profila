@@ -20,12 +20,13 @@ private final ExecutorService executor;
     private AtomicBoolean runningFlag;
     private ConcurrentHashMap<String, List<String>> trees;
 
-    PeerListener(Set<String> neighbours, ServerSocket listenSocket, AtomicBoolean runningFlag) {
+    PeerListener(Set<String> neighbours, ServerSocket listenSocket, AtomicBoolean runningFlag,
+                 ConcurrentHashMap<String, List<String>> trees) {
         this.neighbours = neighbours;
         this.listenSocket = listenSocket;
         this.runningFlag = runningFlag;
+        this.trees = trees;
 
-        this.trees = new ConcurrentHashMap<>();
         executor = Executors.newFixedThreadPool(NUMBER_OF_THREADS);
     }
 
