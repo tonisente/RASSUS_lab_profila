@@ -57,6 +57,8 @@ public class CoordinatorNode {
 
 		ServerSocket passiveSocket = openPassiveSocket();
 
+		System.out.println("Coordinator started ....");
+		
 		while (this.runningFlag) {
 
 			Socket newActiveSocket = accept(passiveSocket);

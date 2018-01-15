@@ -37,6 +37,8 @@ public class CoordinatorRequestWorker implements Runnable {
 	 * Key for synchronized block to protect access to system nodes data structure.
 	 */
 	private final Object lockingKey;
+	
+	private String controlMessage;
 
 	/**
 	 * Constructor with base parameters, essential to communicate to the client.
@@ -59,6 +61,8 @@ public class CoordinatorRequestWorker implements Runnable {
 	@Override
 	public void run() {
 
+		this.controlMessage = "";
+		
 		// opening out and in stream
 		PrintWriter outStream = createPrintWriter(this.activeSocket);
 		BufferedReader inStream = createBufferedReader(this.activeSocket);
@@ -87,6 +91,13 @@ public class CoordinatorRequestWorker implements Runnable {
 
 		// taking the right case
 		int requestType = Integer.valueOf(semicolonSeparated[0]);
+		
+		//for control output
+		String clientAddress = this.activeSocket.getInetAddress().getHostAddress();
+		int clientPort = this.activeSocket.getPort();
+		
+		this.controlMessage += "Request type " + requestType + " from " + clientAddress + ":" + clientPort + "\n\t";
+		
 		switch (requestType) {
 		case 1:
 			caseNewNode(semicolonSeparated);
@@ -98,11 +109,13 @@ public class CoordinatorRequestWorker implements Runnable {
 			caseGetNeighbors(semicolonSeparated, outStream);
 			break;
 		default:
-			System.out.println("Unknown request type.");
+			System.out.println("Unknown request type. Closing connection.");
 			closeSocket(this.activeSocket);
 			return;
 
 		}
+		
+		System.out.print(controlMessage);
 	}
 
 	/**
@@ -223,6 +236,8 @@ public class CoordinatorRequestWorker implements Runnable {
 				this.systemNodes.put(newAddress, newSocketAddress);
 			}
 
+		
+		this.controlMessage += "Node " + newAddress + " added to system.\n";
 		closeSocket(this.activeSocket);
 		return;
 	}
@@ -236,17 +251,22 @@ public class CoordinatorRequestWorker implements Runnable {
 
 		final int wantedCount = 3;
 
+		String ip = semicolonSeparated[1];
+		String port = semicolonSeparated[2];
 		if (semicolonSeparated.length >= wantedCount) {
 
-			String ip = semicolonSeparated[1];
-			String port = semicolonSeparated[2];
 			String key = ip + ":" + port;
 
 			synchronized (this.lockingKey) {
 				this.systemNodes.remove(key);
 			}
+			
+			this.controlMessage += "Node " + ip + ":" + port + " removed from system.\n.";
 		}
-
+		else
+			this.controlMessage += "Node " + ip + ":" + port + " already removed.\n.";
+		
+		
 		closeSocket(this.activeSocket);
 		return;
 	}
@@ -267,13 +287,18 @@ public class CoordinatorRequestWorker implements Runnable {
 			return;
 		}
 
+		this.controlMessage += "Returned neighbors: ";
 		String[] neighbors = getNNeighbors(neighborsCount);
 		for (String toSend : neighbors) {
 			if (toSend == null)
 				break;
 			outStream.println(toSend);
+			
+			this.controlMessage += toSend + " | ";
 		}
-
+		this.controlMessage += "\n";
+		
+		
 		closeSocket(this.activeSocket);
 		return;
 	}
