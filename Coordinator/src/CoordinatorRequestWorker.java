@@ -102,10 +102,10 @@ public class CoordinatorRequestWorker implements Runnable {
 		case 1:
 			caseNewNode(semicolonSeparated);
 			break;
-		case 2:
+		case 3:
 			caseMissingNode(semicolonSeparated);
 			break;
-		case 3:
+		case 2:
 			caseGetNeighbors(semicolonSeparated, outStream);
 			break;
 		default:
@@ -322,7 +322,7 @@ public class CoordinatorRequestWorker implements Runnable {
 		}
 		int i = 0;
 		while (chosenNodes.size() != count) {
-			int index = (int) (Math.random() * (size - 1));
+			int index = (int) (Math.random() * size);
 			String neighbor = keys.get(index);
 			if (chosenNodes.add(neighbor)) {
 				neighbors[i] = neighbor;
