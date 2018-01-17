@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class PeerListener implements Runnable, IServer {
 
     private static final int MINIMAL_NUMBER_OF_NEIGHBOURS = 2;
-    private static final int NUMBER_OF_THREADS = 10;
+    private static final int NUMBER_OF_THREADS = 30;
 
 private final ExecutorService executor;
     private Set<String> neighbours;

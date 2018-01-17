@@ -73,9 +73,8 @@ public class PeerListenerWorker implements Runnable {
                 break;
             case "6":            	
             	String myKey = components[1] + ";" + components[2];
-            	if(this.trees.get(myKey).size() == 0)
-            		return "";
-            	
+            	if(this.trees.get(myKey).isEmpty())
+            		break;
             	while(!allChildrenResponded(components[1],components[2]));
                 spreadMessage(components[1], components[2], components[3]);
                 break;
@@ -99,7 +98,6 @@ public class PeerListenerWorker implements Runnable {
     // message type 4
     private String addNeighbour(String ipAddress, String port) {
         neighbours.add(ipAddress + ";" + port);
-
         return "1";
     }
 
@@ -153,9 +151,9 @@ public class PeerListenerWorker implements Runnable {
     // message type 7
     private void acceptParentship(String rootIpAddress, String rootPort, String ipSender, String portSender, String status) {
 //        String key = rootIpAddress + ";" + rootPort; // TODO ?!
-        String key = "localhost" + ";" + rootPort;
+        String key = rootIpAddress + ";" + rootPort;
 //        String value = ipSender + ";" + portSender; // TODO ?!
-        String sender = "localhost;" + portSender;
+        String sender = ipSender + ";" + portSender;
 
         for(ChildNode child:trees.get(key)) {
         	if(child.getTransportAddress().equalsIgnoreCase(sender)) {
@@ -169,7 +167,7 @@ public class PeerListenerWorker implements Runnable {
 
     }
     
-    private boolean allChildrenResponded(String ip,String port) {
+    private synchronized boolean allChildrenResponded(String ip,String port) {
     	boolean value=true;
     	
     	List<ChildNode> test = this.trees.get(ip+";"+port);
