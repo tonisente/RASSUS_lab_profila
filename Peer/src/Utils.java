@@ -16,10 +16,13 @@ public class Utils {
      * @param message
      */
     public static void sendMessage(String destinationIpAddress, Integer destinationPort, String message) {
+    	
         try (Socket clientSocket = new Socket(destinationIpAddress, destinationPort)) {
+        	
             PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
             
             outToServer.println(message);//WRITE
+            
         } catch (NumberFormatException e) {
             e.printStackTrace();
         } catch (UnknownHostException e) {
@@ -36,7 +39,7 @@ public class Utils {
             BufferedReader inRead=new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             
             outToServer.println(message);
-            String line=inRead.readLine();
+            //String line=inRead.readLine();
     	} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -56,8 +59,12 @@ public class Utils {
      * @param message content
      */
     public static void sendMessage(String transportAddress, String message) {
+    	
         String[] components = transportAddress.split(";");
-        sendMessage(components[0], Integer.parseInt(components[1]), message);
+        String host = components[0];
+        int port = Integer.parseInt(components[1]);
+        
+        sendMessage(host, port, message);
     }
 
     /**
