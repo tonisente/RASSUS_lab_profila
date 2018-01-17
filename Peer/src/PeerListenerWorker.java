@@ -16,9 +16,11 @@ public class PeerListenerWorker implements Runnable {
 	private Socket clientSocket;
 	private Set<String> neighbours;
 	private ConcurrentHashMap<String, List<ChildNode>> trees;
+	
+	private final Object syncKey;
 
 	PeerListenerWorker(Socket clientSocket, AtomicBoolean runngingFlag, Set<String> neighbours,
-			ConcurrentHashMap<String, List<ChildNode>> trees, String myAddress, Integer myPort) {
+			ConcurrentHashMap<String, List<ChildNode>> trees, String myAddress, Integer myPort, Object syncKey) {
 		this.clientSocket = clientSocket;
 		this.runningFlag = runngingFlag;
 		this.neighbours = neighbours;
@@ -26,6 +28,8 @@ public class PeerListenerWorker implements Runnable {
 
 		MY_ADDRESS = myAddress;
 		MY_PORT = myPort;
+		
+		this.syncKey = syncKey;
 	}
 
 	@Override
@@ -74,7 +78,7 @@ public class PeerListenerWorker implements Runnable {
 		case "5":// tree creation
 			String parentHost = components[3];
 			String parentPort = components[4];
-
+			
 			treeCreation(rootHost, rootPort, parentHost, Integer.parseInt(parentPort));
 			break;
 		case "6":// message
@@ -95,7 +99,7 @@ public class PeerListenerWorker implements Runnable {
 			// waiting for tree creation
 			while (!allChildrenResponded(rootHost, rootPort));
 
-			System.out.println("ROOT: Tree created. Sending message further...");
+			System.out.println("Tree created. Sending message further...");
 			spreadMessage(rootHost, rootPort, message);
 			
 			// delete tree from
@@ -107,16 +111,22 @@ public class PeerListenerWorker implements Runnable {
 			String childPort = components[4];
 			String status = components[5];
 
-			acceptParentship(rootHost, rootPort, childHost, childPort, status);
-
 			String myID = this.MY_ADDRESS + ";" + this.MY_PORT;
 			String rootID = rootHost + ";" + rootPort;
-			if(allChildrenResponded(rootHost, rootPort) && myID.equals(rootID)) {
-				System.out.println("Tree created. Sending message further...");
-				messageBroadcast("Hello World!!!");
-				this.trees.remove(myID);
-			}
 			
+			
+			//Brane genije :D
+			synchronized(syncKey) {
+				acceptParentship(rootHost, rootPort, childHost, childPort, status);
+	
+				if(myID.equals(rootID))
+					if(allChildrenResponded(rootHost, rootPort)) {
+		
+						System.out.println("ROOT: Tree created. Sending message further...");
+						messageBroadcast("Hello World!!!");
+						this.trees.remove(myID);
+				}
+			}
 			break;
 		default:
 			System.out.println("Recieved message is invalid!");
@@ -146,10 +156,13 @@ public class PeerListenerWorker implements Runnable {
 			Utils.sendMessage(ipSender, portSender, declineResponse);
 			return;
 		}
+		
+		trees.put(keyRoot, new ArrayList<>());
+		
 		// confirm parent
 		Utils.sendMessage(ipSender, portSender, acceptResponse);
 
-		trees.put(keyRoot, new ArrayList<>());
+		
 
 		// send information to neighbours (except to node who send this message)
 		for (String neighbour : neighbours) {
@@ -186,7 +199,7 @@ public class PeerListenerWorker implements Runnable {
 	}
 
 	// message type 7
-	private void acceptParentship(String rootIpAddress, String rootPort, String ipSender, String portSender,
+	private synchronized void acceptParentship(String rootIpAddress, String rootPort, String ipSender, String portSender,
 			String status) {
 		// String key = rootIpAddress + ";" + rootPort; // TODO ?!
 		String key = rootIpAddress + ";" + rootPort;
@@ -209,13 +222,13 @@ public class PeerListenerWorker implements Runnable {
 
 		boolean value = true;
 
-		List<ChildNode> children = this.trees.get(ip + ";" + port);
-		for (ChildNode childNode : children) {
-			if (childNode.getChildStatus().equals(ChildStatus.PENDING)) {
-				value = false;
-				break;
+			List<ChildNode> children = this.trees.get(ip + ";" + port);
+			for (ChildNode childNode : children) {
+				if (childNode.getChildStatus().equals(ChildStatus.PENDING)) {
+					value = false;
+					break;
+				}
 			}
-		}
 		return value;
 	}
 

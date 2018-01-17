@@ -19,6 +19,8 @@ public class Peer {
 
 	private String MY_ADDRESS;
 	private int MY_PORT;
+	
+	private final Object syncKey = new Object();
 
 	// every neighbour is stored as string with value "ip_address;port"
 	private Set<String> neighbours;
@@ -69,7 +71,7 @@ public class Peer {
 		System.out.println("Starting ... ");
 
 		// start listening tread
-		Thread listenThread = new Thread(new PeerListener(neighbours, listenSocket, runningFlag, trees));
+		Thread listenThread = new Thread(new PeerListener(neighbours, listenSocket, runningFlag, trees, syncKey));
 		listenThread.start();
 
 		// Utils.sleep(500);
@@ -103,6 +105,7 @@ public class Peer {
 				break;
 			case 'm': // message
 				treeRequest(); // type 5 message
+				
 				break;
 			case 'n': // get list of neighbours from coordinator
 				Integer noNeighbours = Integer.parseInt(command.substring(2, 3));
