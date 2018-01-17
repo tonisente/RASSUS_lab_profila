@@ -86,15 +86,21 @@ public class PeerListenerWorker implements Runnable {
 			System.out.format("Message from %s: %s\n", rootPort, message);
 			
 			// check if have no children
-			if(this.trees.get(treeKey).isEmpty())
+			if(this.trees.get(treeKey).isEmpty()) {
+				trees.remove(treeKey);
 				break;
+			}
 			
 			// do have children
 			// waiting for tree creation
 			while (!allChildrenResponded(rootHost, rootPort));
 
-			System.out.println("Tree created. Sending message further...");
+			System.out.println("ROOT: Tree created. Sending message further...");
 			spreadMessage(rootHost, rootPort, message);
+			
+			// delete tree from
+			trees.remove(treeKey);
+			
 			break;
 		case "7":
 			String childHost = components[3];
@@ -106,6 +112,7 @@ public class PeerListenerWorker implements Runnable {
 			String myID = this.MY_ADDRESS + ";" + this.MY_PORT;
 			String rootID = rootHost + ";" + rootPort;
 			if(allChildrenResponded(rootHost, rootPort) && myID.equals(rootID)) {
+				System.out.println("Tree created. Sending message further...");
 				messageBroadcast("Hello World!!!");
 				this.trees.remove(myID);
 			}
@@ -176,9 +183,6 @@ public class PeerListenerWorker implements Runnable {
 				Utils.sendMessage(child.getTransportAddress(),
 						String.format("%d;%s;%s;%s", 6, ipRoot, portRoot, sendMessage));
 		}
-
-		// delete tree from
-		trees.remove(ipRoot + ";" + portRoot);
 	}
 
 	// message type 7
