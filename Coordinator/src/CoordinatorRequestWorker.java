@@ -144,7 +144,7 @@ public class CoordinatorRequestWorker implements Runnable {
 	private PrintWriter createPrintWriter(Socket activeSocket) {
 
 		try {
-			return new PrintWriter(new OutputStreamWriter(this.activeSocket.getOutputStream()));
+			return new PrintWriter(new OutputStreamWriter(this.activeSocket.getOutputStream()),true);
 		} catch (IOException e) {
 			System.err.println("Exception while opening print writer.");
 			return null;

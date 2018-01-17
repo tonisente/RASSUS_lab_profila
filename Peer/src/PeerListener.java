@@ -18,10 +18,10 @@ private final ExecutorService executor;
     private Set<String> neighbours;
     private ServerSocket listenSocket;
     private AtomicBoolean runningFlag;
-    private ConcurrentHashMap<String, List<String>> trees;
+    private ConcurrentHashMap<String, List<ChildNode>> trees;
 
     PeerListener(Set<String> neighbours, ServerSocket listenSocket, AtomicBoolean runningFlag,
-                 ConcurrentHashMap<String, List<String>> trees) {
+                 ConcurrentHashMap<String, List<ChildNode>> trees) {
         this.neighbours = neighbours;
         this.listenSocket = listenSocket;
         this.runningFlag = runningFlag;
@@ -38,7 +38,7 @@ private final ExecutorService executor;
 
     }
 
-    /* runnbale */
+    /* runnable */
     @Override
     public void run() {
         startup();
@@ -62,7 +62,7 @@ private final ExecutorService executor;
 
                  // execute a tcp request handler in a new thread
                  Runnable worker = new PeerListenerWorker(clientSocket, runningFlag, neighbours, trees,
-                         listenSocket.getLocalSocketAddress().toString(), listenSocket.getLocalPort());
+                         "localhost", listenSocket.getLocalPort());
                  executor.execute(worker);
             } catch (SocketTimeoutException ignore_and_continue) {
             } catch (IOException ex) {

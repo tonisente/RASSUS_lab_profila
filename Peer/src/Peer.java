@@ -23,7 +23,7 @@ public class Peer {
     private static final int LISTEN_SOCKET_TIMEOUT = 500; // ms
     private ServerSocket listenSocket;
     private AtomicBoolean runningFlag;
-    private ConcurrentHashMap<String, List<String>> trees;
+    private ConcurrentHashMap<String, List<ChildNode>> trees;
 
 
 //       TODO:  DONT DELETE THIS CONSTUCTOR!! IT SHOULD BE USED IN FINAL VERSION.
@@ -70,9 +70,9 @@ public class Peer {
         Thread listenThread = new Thread(new PeerListener(neighbours, listenSocket, runningFlag, trees));
         listenThread.start();
 
-        Utils.sleep(500);
+        //Utils.sleep(500);
 
-        sayHelloToCoordinator();
+        //sayHelloToCoordinator();
 
         // wait for user input
         waitForCommand();
@@ -102,9 +102,7 @@ public class Peer {
                 break;
             case 'm': // message
             	treeRequest();
-                Utils.sleep(1000); // wait a little bit for tree to spread
-            	messageBroadcast("Hello world!!!");
-            	trees.remove(MY_ADDRESS + ";" + MY_PORT);
+                //Utils.sleep(1000); // wait a little bit for tree to spread
                 break;
             case 'n': // get list of neighbours from coordinator
                 Integer noNeighbours = Integer.parseInt(command.substring(2, 3));
@@ -139,15 +137,13 @@ public class Peer {
      * @param n number of requested neighbours from central coordinator
      */
     private void getNeighbours(int n) {
-    	String message = "2;" + n;
+    	String message = "2;" + String.valueOf(n);
     	List<String> answer = Utils.sendMessageWithAnswer(COORDINATOR_IPADRESS, COORDINATOR_PORT, message);
 
-        neighbours.addAll(answer);
-
+        askForNeighborAcceptance(answer);
         // print all current neighbours
-        System.out.println();
         System.out.println(" - neighbours -");
-        for (String neighbour : neighbours) {
+        for (String neighbour : this.neighbours) {
             System.out.println("    -> " + neighbour);
         }
         System.out.println();
@@ -158,28 +154,17 @@ public class Peer {
      */
     private void treeRequest() {
         String key = MY_ADDRESS + ";" + MY_PORT;
-        trees.put(key, new ArrayList<>());
+        trees.put(key, new ArrayList<ChildNode>());
 
         String message = String.format("%d;%s;%s;%s;%s", 5, MY_ADDRESS, MY_PORT, MY_ADDRESS, MY_PORT);
 
     	// TODO: parallel in multiple threads?!
         for (String neighbour : neighbours) {
+        	trees.get(this.MY_ADDRESS+";"+this.MY_PORT).add(new ChildNode(neighbour));
             Utils.sendMessage(neighbour, message);
         }
     }
 
-    /**
-     * Broadcast message to all neighbours.
-     * @param message
-     */
-    private void messageBroadcast(String message) {
-        String sendMessage = String.format("%d;%s;%s;%s", 6, MY_ADDRESS, MY_PORT, message);
-
-        // multithread?!
-        for (String child : trees.get(MY_ADDRESS + ";" + MY_PORT)) {
-            Utils.sendMessage(child, sendMessage);
-        }
-    }
 
     /**
      * Adds manualy given peer(s) as neighbours (mostly used for testing purpose).
@@ -191,6 +176,41 @@ public class Peer {
         for (int i = 1; i < newNbrs.length; i++) {
             neighbours.add(ipAddress + ";" + newNbrs[i]);
         }
+    }
+    /*
+     Method used for checking who wants and can be this node neighbor.
+     */
+    private void askForNeighborAcceptance(List<String> nb) {
+    	String ip=null;
+    	Integer port=null;
+    	String message=null;
+    	String answer=null;
+    	for(String s:nb) {
+    		if(!this.neighbours.contains(s) && !s.equalsIgnoreCase(this.MY_ADDRESS+";"+this.MY_PORT)) {
+    			ip=s.split(";")[0];
+    			port=Integer.parseInt(s.split(";")[1]);
+    			message="4;"+this.MY_ADDRESS+";"+this.MY_PORT;
+    			answer=Utils.messageWithAns(ip, port, message);
+    			if(!answer.equalsIgnoreCase("1")) {
+    				continue;
+    			}
+    			else {
+    				this.neighbours.add(s);
+    				System.out.println(ip+";"+port+" zeli biti tvoj susjed!");
+    			}
+    		}
+    	}
+    }
+    
+    private boolean waitForAllChildrenToRespond() {
+    	boolean value=true;
+    	for (ChildNode ch:this.trees.get(this.MY_ADDRESS+";"+this.MY_PORT)) {
+    		if(ch.getChildStatus().equals(ChildStatus.PENDING)) {
+    			value=false;
+    			break;
+    		}
+    	}
+    	return value;
     }
 
     public static void main(String args[]) {

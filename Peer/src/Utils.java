@@ -18,15 +18,33 @@ public class Utils {
     public static void sendMessage(String destinationIpAddress, Integer destinationPort, String message) {
         try (Socket clientSocket = new Socket(destinationIpAddress, destinationPort)) {
             PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
-
+            
             outToServer.println(message);//WRITE
         } catch (NumberFormatException e) {
             e.printStackTrace();
         } catch (UnknownHostException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
+        	System.err.println("Hitile je exc!");
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+    
+    public static String sendParentRequest(String destinationIpAddress, Integer destinationPort, String message) {
+    	try (Socket clientSocket = new Socket(destinationIpAddress, destinationPort)) {
+            PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
+            BufferedReader inRead=new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            
+            outToServer.println(message);
+            String line=inRead.readLine();
+    	} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	return null;
     }
 
     /**
@@ -61,17 +79,18 @@ public class Utils {
 
             outToServer.println(message);//WRITE
 
-            String line;
+            String line=null;
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) break;
 
                 receivedAnswer.add(line);
             }
-        } catch (NumberFormatException e) {
+            return receivedAnswer;
+        }
+        catch (UnknownHostException e) {
             e.printStackTrace();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
 
@@ -101,5 +120,25 @@ public class Utils {
                 Thread.sleep(ms);
             } catch (InterruptedException ignore) {
         }
+    }
+    /*
+     * Method used when a new node enters network. 
+     */
+    public static String messageWithAns(String ip,Integer port,String message) {
+    	String answer=null;
+    	try(Socket clientSocket=new Socket(ip,port);){
+    		PrintWriter outToServer = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()), true);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            
+            outToServer.println(message);
+            answer=reader.readLine();
+    	} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	return answer;
     }
 }
