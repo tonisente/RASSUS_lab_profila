@@ -99,7 +99,7 @@ public class PeerListenerWorker implements Runnable {
 			// waiting for tree creation
 			while (!allChildrenResponded(rootHost, rootPort));
 
-			System.out.println("Tree created. Sending message further...");
+			System.out.println("Tree ("+ treeKey +") created. Sending message further...");
 			spreadMessage(rootHost, rootPort, message);
 			
 			// delete tree from
