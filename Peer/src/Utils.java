@@ -6,6 +6,9 @@ import java.util.List;
 
 public class Utils {
 
+	public static String COORDINATOR_IP = "localhost";
+	public static int COORDINATOR_PORT = 50000;
+	
     /**
      * Sends a message using socket with random transport address.
      * After the message is sent, tcp connection closes.
@@ -15,7 +18,7 @@ public class Utils {
      * @param destinationPort
      * @param message
      */
-    public static void sendMessage(String destinationIpAddress, Integer destinationPort, String message) {
+    public static boolean sendMessage(String destinationIpAddress, Integer destinationPort, String message) {
     	
         try (Socket clientSocket = new Socket(destinationIpAddress, destinationPort)) {
         	
@@ -23,14 +26,21 @@ public class Utils {
             
             outToServer.println(message);//WRITE
             
+            return true;
+            
         } catch (NumberFormatException e) {
             e.printStackTrace();
         } catch (UnknownHostException e) {
             //e.printStackTrace();
         	System.err.println("Hitile je exc!");
         } catch (IOException e) {
-            e.printStackTrace();
+        	String neighbor = destinationIpAddress + ";" + destinationPort;
+			System.out.println(neighbor + " is not present. Informing coordinator...");
+			tellCoordinatorAboutFailure(destinationIpAddress, destinationPort);
+			return false;
         }
+        
+        return true;
     }
     
     public static String sendParentRequest(String destinationIpAddress, Integer destinationPort, String message) {
@@ -58,13 +68,13 @@ public class Utils {
      * @param transportAddress in "ipAddress;port" format
      * @param message content
      */
-    public static void sendMessage(String transportAddress, String message) {
+    public static boolean sendMessage(String transportAddress, String message) {
     	
         String[] components = transportAddress.split(";");
         String host = components[0];
         int port = Integer.parseInt(components[1]);
         
-        sendMessage(host, port, message);
+        return sendMessage(host, port, message);
     }
 
     /**
@@ -143,9 +153,15 @@ public class Utils {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			String neighbor = ip + ";" + port;
+			System.out.println(neighbor + "is not present. Informing coordinator...");
+			tellCoordinatorAboutFailure(ip, port);
 		}
     	return answer;
+    }
+    public static void tellCoordinatorAboutFailure(String hostName, int hostPort) {
+    	String message = "3;" + hostName + ";" + hostPort;
+    	
+    	Utils.sendMessage(Utils.COORDINATOR_IP, Utils.COORDINATOR_PORT, message);
     }
 }
