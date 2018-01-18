@@ -153,11 +153,14 @@ public class PeerListenerWorker implements Runnable {
 		String declineResponse = responseBase + ";0";
 
 		if (trees.containsKey(keyRoot)) {
+			//System.out.println("\tTree "+ keyRoot +" | Parent request from: " + sender + " | Status: DECLINED" );
 			Utils.sendMessage(ipSender, portSender, declineResponse);
 			return;
 		}
 		
 		trees.put(keyRoot, new ArrayList<>());
+		
+		//System.out.println("\tTree "+ keyRoot +" | Parent request from: " + sender + " | Status: ACCEPTED" );
 		
 		// confirm parent
 		Utils.sendMessage(ipSender, portSender, acceptResponse);
