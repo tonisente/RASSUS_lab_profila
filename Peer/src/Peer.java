@@ -164,8 +164,11 @@ public class Peer {
 		String message = String.format("%d;%s;%s;%s;%s", 5, MY_ADDRESS, MY_PORT, MY_ADDRESS, MY_PORT);
 		
 		for (String neighbour : neighbours) {
-			trees.get(key).add(new ChildNode(neighbour));
-			Utils.sendMessage(neighbour, message);
+			
+			if(Utils.sendMessage(neighbour, message))
+				trees.get(key).add(new ChildNode(neighbour));
+			else
+				this.neighbours.remove(neighbour);
 		}
 	}
 
@@ -197,6 +200,8 @@ public class Peer {
 				port = Integer.parseInt(s.split(";")[1]);
 				message = "4;" + this.MY_ADDRESS + ";" + this.MY_PORT;
 				answer = Utils.messageWithAns(ip, port, message);
+				if(answer == null)
+					continue;
 				if (!answer.equalsIgnoreCase("1")) {
 					continue;
 				} else {

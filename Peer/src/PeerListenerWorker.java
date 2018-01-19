@@ -87,7 +87,7 @@ public class PeerListenerWorker implements Runnable {
 			String treeKey = rootHost + ";" + rootPort;
 
 			//received message
-			System.out.format("Message from %s: %s\n", rootPort, message);
+			System.out.format("Message from root %s: %s\n", rootPort, message);
 			
 			// check if have no children
 			if(this.trees.get(treeKey).isEmpty()) {
@@ -99,7 +99,7 @@ public class PeerListenerWorker implements Runnable {
 			// waiting for tree creation
 			while (!allChildrenResponded(rootHost, rootPort));
 
-			System.out.println("Tree created. Sending message further...");
+			System.out.println("Tree ("+ treeKey +") created. Sending message....");
 			spreadMessage(rootHost, rootPort, message);
 			
 			// delete tree from
@@ -122,7 +122,7 @@ public class PeerListenerWorker implements Runnable {
 				if(myID.equals(rootID))
 					if(allChildrenResponded(rootHost, rootPort)) {
 		
-						System.out.println("ROOT: Tree created. Sending message further...");
+						System.out.println("ROOT: Tree created. Sending message....");
 						messageBroadcast("Hello World!!!");
 						this.trees.remove(myID);
 				}
@@ -153,11 +153,14 @@ public class PeerListenerWorker implements Runnable {
 		String declineResponse = responseBase + ";0";
 
 		if (trees.containsKey(keyRoot)) {
+			//System.out.println("\tTree "+ keyRoot +" | Parent request from: " + sender + " | Status: DECLINED" );
 			Utils.sendMessage(ipSender, portSender, declineResponse);
 			return;
 		}
 		
 		trees.put(keyRoot, new ArrayList<>());
+		
+		//System.out.println("\tTree "+ keyRoot +" | Parent request from: " + sender + " | Status: ACCEPTED" );
 		
 		// confirm parent
 		Utils.sendMessage(ipSender, portSender, acceptResponse);
